@@ -6,6 +6,61 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+/* =========================
+   SEARCH (NEW FEATURE)
+========================= */
+app.get("/search", async (req, res) => {
+  const query = req.query.q;
+
+  if (!query) {
+    return res.status(400).json({
+      success: false,
+      error: "Missing search query"
+    });
+  }
+
+  const yt = spawn("yt-dlp", [
+    "ytsearch5:" + query,
+    "-j",
+    "--flat-playlist"
+  ]);
+
+  let data = "";
+
+  yt.stdout.on("data", (chunk) => {
+    data += chunk.toString();
+  });
+
+  yt.on("close", () => {
+    try {
+      const lines = data.trim().split("\n").filter(Boolean);
+      const results = lines.map(line => {
+        const json = JSON.parse(line);
+        return {
+          title: json.title,
+          url: json.url,
+          id: json.id,
+          thumbnail: json.thumbnail
+        };
+      });
+
+      res.json({
+        success: true,
+        results
+      });
+
+    } catch (e) {
+      res.status(500).json({
+        success: false,
+        error: e.message
+      });
+    }
+  });
+});
+
+/* =========================
+   VIDEO DETAILS + DOWNLOAD
+========================= */
 app.get("/api/video", (req, res) => {
   const url = req.query.url;
 
@@ -52,7 +107,6 @@ app.get("/api/video", (req, res) => {
           type: "mp4"
         }));
 
-      // ADD MP3 OPTION
       const audio = (json.formats || [])
         .find(f => f.acodec !== "none");
 
@@ -81,6 +135,9 @@ app.get("/api/video", (req, res) => {
   });
 });
 
+/* =========================
+   SERVER START
+========================= */
 app.listen(process.env.PORT || 3000, () => {
-  console.log("GoTube backend running on Railway");
+  console.log("GoTube FULL API running on Railway");
 });
