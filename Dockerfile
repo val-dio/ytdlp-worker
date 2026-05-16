@@ -1,21 +1,19 @@
-# Use a lightweight base image
-FROM python:3.11-slim
+FROM node:18-slim
 
-# Install system dependencies (FFmpeg is required by yt-dlp to merge audio/video)
+# Install system dependencies (FFmpeg + yt-dlp for media processing)
 RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
     ffmpeg \
     curl \
+    && pip3 install --break-system-packages yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp via pip (so it's easily updatable)
-RUN pip install --no-cache-dir yt-dlp
-
-# Set up your app directory
 WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
 COPY . .
 
-# Install your website's backend dependencies (e.g., if using Python/FastAPI)
-RUN pip install -r requirements.txt
-
-EXPOSE 8080
-CMD ["python", "main.py"]
+CMD ["npm", "start"]
