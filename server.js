@@ -1,9 +1,12 @@
 const express = require("express");
 const { spawn } = require("child_process");
+const cors = require("cors");
 
 const app = express();
+app.use(cors());
+app.use(express.json());
 
-app.get("/download", (req, res) => {
+app.get("/api/video", (req, res) => {
   const url = req.query.url;
 
   if (!url) {
@@ -41,17 +44,32 @@ app.get("/download", (req, res) => {
     try {
       const json = JSON.parse(data);
 
+      const formats = (json.formats || [])
+        .filter(f => f.url && f.ext === "mp4")
+        .map(f => ({
+          quality: f.format_note || "unknown",
+          url: f.url,
+          type: "mp4"
+        }));
+
+      // ADD MP3 OPTION
+      const audio = (json.formats || [])
+        .find(f => f.acodec !== "none");
+
+      if (audio) {
+        formats.push({
+          quality: "mp3",
+          url: audio.url,
+          type: "mp3"
+        });
+      }
+
       res.json({
         success: true,
         title: json.title,
         thumbnail: json.thumbnail,
         duration: json.duration,
-        formats: json.formats
-          .filter(f => f.ext === "mp4")
-          .map(f => ({
-            quality: f.format_note,
-            url: f.url
-          }))
+        formats
       });
 
     } catch (e) {
@@ -64,5 +82,5 @@ app.get("/download", (req, res) => {
 });
 
 app.listen(process.env.PORT || 3000, () => {
-  console.log("yt-dlp worker running");
+  console.log("GoTube backend running on Railway");
 });
