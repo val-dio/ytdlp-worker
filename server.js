@@ -2,37 +2,64 @@ const express = require("express");
 const { spawn } = require("child_process");
 
 const app = express();
-app.use(express.json());
 
 app.get("/download", (req, res) => {
   const url = req.query.url;
 
   if (!url) {
-    return res.status(400).json({ error: "Missing URL" });
+    return res.status(400).json({
+      success: false,
+      error: "Missing URL"
+    });
   }
 
   const yt = spawn("yt-dlp", [
-    "-f",
-    "best",
+    "-j",
     "--no-playlist",
     url
   ]);
 
-  let output = "";
+  let data = "";
+  let error = "";
 
-  yt.stdout.on("data", (data) => {
-    output += data.toString();
+  yt.stdout.on("data", chunk => {
+    data += chunk.toString();
   });
 
-  yt.stderr.on("data", (data) => {
-    console.log(data.toString());
+  yt.stderr.on("data", chunk => {
+    error += chunk.toString();
   });
 
   yt.on("close", () => {
-    res.json({
-      success: true,
-      data: output
-    });
+    if (!data) {
+      return res.status(500).json({
+        success: false,
+        error
+      });
+    }
+
+    try {
+      const json = JSON.parse(data);
+
+      res.json({
+        success: true,
+        title: json.title,
+        thumbnail: json.thumbnail,
+        duration: json.duration,
+        formats: json.formats
+          .filter(f => f.ext === "mp4")
+          .map(f => ({
+            quality: f.format_note,
+            url: f.url
+          }))
+      });
+
+    } catch (e) {
+      res.status(500).json({
+        success: false,
+        error: e.message
+      });
+    }
   });
 });
 
